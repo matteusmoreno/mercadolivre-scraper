@@ -5,16 +5,22 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @NoArgsConstructor
 @Getter @Setter
 public class ProductInfo {
-    private String name;
-    private String description;
-    private String brand;
-    private BigDecimal price;
-    private String category;
-    private String subCategory;
-    private String imageUrl;
-    private String condition;
+    private String productId;
+    private String productUrl;
+    private String productTitle;
+    private String fullDescription;
+    private String productBrand;
+    private String productCondition;
+    private BigDecimal currentPrice;
+    private BigDecimal originalPrice;
+    private String discountPercentage;
+    private Integer installments;
+    private BigDecimal installmentValue;
+    private List<String> galleryImageUrls;
+    private String stockStatus;
 }

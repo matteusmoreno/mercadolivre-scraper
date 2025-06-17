@@ -10,8 +10,8 @@ import java.util.List;
 @NoArgsConstructor
 @Getter @Setter
 public class ProductInfo {
-    private String productId;
-    private String productUrl;
+    private String mercadoLivreId;
+    private String mercadoLivreUrl;
     private String productTitle;
     private String fullDescription;
     private String productBrand;

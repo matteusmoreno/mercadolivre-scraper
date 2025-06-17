@@ -23,7 +23,7 @@ public class ScrapingService {
                 .get();
 
         ProductInfo product = new ProductInfo();
-        product.setProductUrl(url);
+        product.setMercadoLivreUrl(url);
 
         extractProductId(url, product);
         extractProductTitle(doc, product, url);
@@ -43,7 +43,7 @@ public class ScrapingService {
         Pattern pattern = Pattern.compile("MLB(\\d+)");
         Matcher matcher = pattern.matcher(url);
         if (matcher.find()) {
-            product.setProductId("MLB" + matcher.group(1));
+            product.setMercadoLivreId("MLB" + matcher.group(1));
         } else {
             System.err.println("WARN: ID do produto não encontrado na URL: " + url);
         }

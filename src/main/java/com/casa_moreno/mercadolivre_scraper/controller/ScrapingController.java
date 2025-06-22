@@ -32,11 +32,9 @@ public class ScrapingController {
             ProductInfo productInfo = scrapingService.scrapeProduct(request.url());
             return ResponseEntity.ok(productInfo);
         } catch (IOException e) {
-            // Pode ser um erro de rede, URL inválida ou o site bloqueou a requisição
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Erro ao tentar acessar ou analisar a URL: " + e.getMessage());
         } catch (Exception e) {
-            // Captura outras exceções inesperadas durante o scraping
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Ocorreu um erro inesperado: " + e.getMessage());
         }

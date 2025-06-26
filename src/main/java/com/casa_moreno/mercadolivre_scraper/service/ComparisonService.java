@@ -8,8 +8,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class ComparisonService {
@@ -39,32 +43,34 @@ public class ComparisonService {
             fullReport.append("--- Verificando: ").append(dbProduct.productTitle()).append(" (ID: ").append(dbProduct.productId()).append(") ---\n");
 
             if (dbProduct.mercadoLivreUrl() == null || dbProduct.mercadoLivreUrl().isEmpty()) {
-                fullReport.append("Status: ERRO - URL do Mercado Livre não encontrada.\n\n");
+                fullReport.append("Status: ERRO - URL do Mercado Livre não encontrada no banco de dados.\n\n");
                 continue;
             }
 
             try {
                 ProductInfo scrapedProduct = scrapingService.scrapeProduct(dbProduct.mercadoLivreUrl());
-
-                // Monta um payload dinâmico apenas com os campos que mudaram
                 Map<String, Object> updatePayload = buildUpdatePayload(dbProduct, scrapedProduct, fullReport);
 
-                // Se houver algo para atualizar, envia para o backend
                 if (!updatePayload.isEmpty()) {
-                    // Adiciona o ID do produto ao payload, pois o backend precisa dele para saber qual produto atualizar
                     updatePayload.put("productId", dbProduct.productId());
-
                     backendService.updateProduct(token, updatePayload);
                     fullReport.append("  -> Status: ATUALIZAÇÃO ENVIADA PARA O BANCO DE DADOS.\n");
                 } else {
                     fullReport.append("  -> Status: Sem alterações. Produto sincronizado.\n");
                 }
-
                 fullReport.append("\n");
 
+            } catch (IOException e) {
+                if (e.getMessage().contains("página do produto não está mais disponível")) {
+                    System.out.println("AVISO: Produto " + dbProduct.productTitle() + " parece estar indisponível. " + e.getMessage());
+                    fullReport.append("Status: AVISO - Produto indisponível ou página removida.\n\n");
+                } else {
+                    System.err.println("!!! FALHA DE CONEXÃO para o produto " + dbProduct.productTitle() + ": " + e.getMessage());
+                    fullReport.append("Status: ERRO DE CONEXÃO - ").append(e.getMessage()).append("\n\n");
+                }
             } catch (Exception e) {
-                System.err.println("!!! FALHA no processo para o produto " + dbProduct.productTitle() + ": " + e.getMessage());
-                fullReport.append("Status: ERRO - ").append(e.getMessage()).append("\n\n");
+                System.err.println("!!! FALHA GERAL no processo para o produto " + dbProduct.productTitle() + ": " + e.getMessage());
+                fullReport.append("Status: ERRO INESPERADO - ").append(e.getMessage()).append("\n\n");
             }
         }
 
@@ -91,7 +97,9 @@ public class ComparisonService {
             logDifference("Valor da Parcela", db.installmentValue(), scraped.getInstallmentValue(), report);
             payload.put("installmentValue", scraped.getInstallmentValue());
         }
-        if (!Objects.equals(db.discountPercentage(), scraped.getDiscountPercentage())) {
+        String dbDiscount = db.discountPercentage() != null ? db.discountPercentage().replaceAll("[^0-9]", "") : null;
+        String scrapedDiscount = scraped.getDiscountPercentage() != null ? scraped.getDiscountPercentage().replaceAll("[^0-9]", "") : null;
+        if (!Objects.equals(dbDiscount, scrapedDiscount)) {
             logDifference("Desconto (%)", db.discountPercentage(), scraped.getDiscountPercentage(), report);
             payload.put("discountPercentage", scraped.getDiscountPercentage());
         }
@@ -99,18 +107,21 @@ public class ComparisonService {
         return payload;
     }
 
-    // Compara BigDecimals ignorando centavos
+    /**
+     * **MODIFICADO**: Compara BigDecimals ignorando diferenças de centavos.
+     * Isso evita atualizações desnecessárias quando o preço muda de 1809.00 para 1809.03, por exemplo.
+     */
     private boolean isDifferent(BigDecimal dbValue, BigDecimal scrapedValue) {
-        if (dbValue == null || scrapedValue == null) {
-            return !Objects.equals(dbValue, scrapedValue);
-        }
+        if (dbValue == null && scrapedValue == null) return false;
+        if (dbValue == null || scrapedValue == null) return true;
+        // Compara apenas a parte inteira do valor.
         return dbValue.longValue() != scrapedValue.longValue();
     }
 
     private void logDifference(String fieldName, Object dbValue, Object scrapedValue, StringBuilder report) {
         report.append("  - Campo: ").append(fieldName).append(" | Status: DIFERENTE\n");
-        report.append("    - BD:     ").append(dbValue).append("\n");
-        report.append("    - Scrape: ").append(scrapedValue).append("\n");
+        report.append("    - Valor no BD:   ").append(dbValue == null ? "N/A" : dbValue).append("\n");
+        report.append("    - Valor Scraped: ").append(scrapedValue == null ? "N/A" : scrapedValue).append("\n");
     }
 
     private String loginAndGetToken() {
